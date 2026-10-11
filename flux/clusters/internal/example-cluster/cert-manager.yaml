@@ -1,0 +1,22 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: cert-manager
+spec:
+  dependsOn: []
+  patches: []
+  components:
+    - ../../${flux_git_path_to_root_from_clusters_dir}${flux_git_repo_path_base}/clusters/${cluster_location}/${cluster_name}/_components/cert-manager
+  interval: ${reconcilation_for_ks:="10m0s"}
+  postBuild:
+    substitute:
+      parent_kustomization: cert-manager # Current Kustomization name
+    substituteFrom:
+      - kind: ConfigMap
+        name: vars-cert-manager
+        optional: true
+      - kind: Secret
+        name: secrets-cert-manager
+        optional: true
+  path: ./flux/base/_template-helm
+  prune: true

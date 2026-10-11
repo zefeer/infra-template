@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pinned-tag
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/home-assistant/home-assistant:2026.9.1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pinned-digest
+spec:
+  containers:
+    - name: app
+      image: nginx@sha256:5f44022eab9198d75939d9eaa5341bc077eca16fa51d4ef32d33f1bd4c8cbe7d
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: registry-port-with-tag
+spec:
+  containers:
+    - name: app
+      image: registry.example.com:5000/tools/backup:1.4.0
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: latest-tag
+spec:
+  containers:
+    - name: app
+      image: nginx:latest
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: no-tag
+spec:
+  containers:
+    - name: app
+      image: nginx
+---
+# A registry port is not a tag
+apiVersion: v1
+kind: Pod
+metadata:
+  name: registry-port-no-tag
+spec:
+  containers:
+    - name: app
+      image: registry.example.com:5000/tools/backup
+---
+# Only the init container is unpinned
+apiVersion: v1
+kind: Pod
+metadata:
+  name: init-container-latest
+spec:
+  initContainers:
+    - name: init
+      image: busybox:latest
+  containers:
+    - name: app
+      image: nginx:1.29.1

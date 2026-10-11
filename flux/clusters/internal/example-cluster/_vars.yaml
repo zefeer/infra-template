@@ -1,0 +1,31 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: vars
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
+    kustomize.toolkit.fluxcd.io/ssa: merge
+spec:
+  dependsOn: []
+  patches: []
+  # detect drift and undo kubectl edits every minute
+  interval: 10m0s
+  # wait for all applied resources to become ready
+  wait: true
+  # give up waiting after three minutes
+  timeout: 3m0s
+  # retry every two minutes on apply or waiting failures
+  retryInterval: 2m0s
+  # remove stale resources from cluster
+  prune: false
+  # enable this to recreate resources on immutable fields changes
+  force: false
+  # set the namespace for all resources
+  targetNamespace: flux-system
+  path: ./flux/clusters/_vars
+  postBuild:
+    substituteFrom: []
+  # The components paths must be local and relative to the path specified by .spec.path
+  components:
+    - ../../${flux_git_path_to_root_from_clusters_dir}${flux_git_repo_path_base}/clusters/${cluster_location}/_vars
+    - ../../${flux_git_path_to_root_from_clusters_dir}${flux_git_repo_path_base}/clusters/${cluster_location}/${cluster_name}/_vars

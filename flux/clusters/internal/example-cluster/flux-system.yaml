@@ -1,0 +1,46 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: flux-system
+spec:
+  dependsOn: []
+  patches: []
+  components: []
+  interval: ${reconcilation_for_ks:="10m0s"}
+  path: ./flux/base/_template-helm
+  prune: false # We don't want to delete flux occassionally
+  postBuild:
+    substitute:
+      parent_kustomization: flux-system # Current Kustomization name
+      helm_releaseName: flux-system
+      target_namespace: flux-system
+      source_repositoryUrl: https://fluxcd-community.github.io/helm-charts
+      source_repositoryName: fluxcd-community
+      helm_chartName: flux2
+      # Check which chart version is compatible with the Flux version you want to install:
+      # https://artifacthub.io/packages/helm/fluxcd-community/flux2
+      helm_chartVersion: 2.19.1
+      # Add the label app.kubernetes.io/part-of=flux to all pods created by the flux-system deployments.
+      # This is useful for monitoring and observability purposes, as it allows you to easily identify which pods belong to the flux-system.
+      helm_chartPostRenderers: |
+        [
+          {
+            "kustomize": {
+              "patches": [
+                {
+                  "patch": "- op: add\n  path: /spec/template/metadata/labels/app.kubernetes.io~1part-of\n  value: flux",
+                  "target": {
+                    "kind": "Deployment"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+    substituteFrom:
+      - kind: ConfigMap
+        name: vars-flux-system
+        optional: true
+      - kind: Secret
+        name: secrets-flux-system
+        optional: true

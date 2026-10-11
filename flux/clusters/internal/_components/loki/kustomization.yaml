@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+generatorOptions:
+  # Stable names: alloy-config is referenced by the Alloy chart's volume mount
+  disableNameSuffixHash: true
+  annotations:
+    # Alloy relabel rules and Grafana provisioning both use $-syntax that Flux
+    # postBuild envsubst would eat
+    kustomize.toolkit.fluxcd.io/substitute: disabled
+
+configMapGenerator:
+  # Loki datasource, discovered by the Grafana sidecar via its label
+  - name: grafana-datasource-loki
+    namespace: monitoring
+    behavior: create
+    options:
+      labels:
+        grafana_datasource: "1"
+        flux-app: loki
+    files:
+      - loki-datasource.yaml
+
+resources: []

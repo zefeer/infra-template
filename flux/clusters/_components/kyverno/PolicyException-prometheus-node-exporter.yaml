@@ -1,0 +1,22 @@
+# Namespace comes from the component (kyverno), the only namespace allowed to hold exceptions
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: prometheus-node-exporter
+spec:
+  policyRefs:
+    - kind: ValidatingPolicy
+      name: disallow-host-path
+    - kind: ValidatingPolicy
+      name: disallow-host-namespaces
+  # Both conditions: the label alone can be set by anyone on any pod
+  matchConditions:
+    - name: prometheus-node-exporter-in-monitoring
+      expression: >-
+        object.metadata.namespace == 'monitoring' &&
+        has(object.metadata.labels) &&
+        object.metadata.labels[?'app.kubernetes.io/name'].orValue('') == 'prometheus-node-exporter'
+  properties:
+    reason: >-
+      Prometheus Node Exporter: the agent runs privileged to collect node metrics;
+  reportResult: skip

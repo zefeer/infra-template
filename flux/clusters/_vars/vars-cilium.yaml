@@ -1,0 +1,6 @@
+helm_releaseName=cilium
+target_namespace=kube-system
+source_repositoryUrl=https://helm.cilium.io/
+source_repositoryName=cilium
+helm_chartName=cilium
+helm_chartVersion=1.20.2

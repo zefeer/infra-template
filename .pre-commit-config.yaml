@@ -1,0 +1,22 @@
+repos:
+  - repo: local
+    hooks:
+      - id: kustomizations-vars-and-values
+        name: Generate missing kustomizations
+        entry: .pre-commit-scripts/kustomizations-vars-and-values-generator.sh
+        language: script
+        pass_filenames: false
+        # The scripts scan the whole tree and exit early when nothing under flux/ is staged.
+        # A files: filter can't replace that: pre-commit never passes deleted files to hooks.
+        always_run: true
+      - id: kustomizations-clusters
+        name: Generate or update kustomizations and replacements for cluster apps
+        entry: .pre-commit-scripts/kustomizations-deployments.sh
+        language: script
+        pass_filenames: false
+        always_run: true
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.0
+    hooks:
+      - id: gitleaks

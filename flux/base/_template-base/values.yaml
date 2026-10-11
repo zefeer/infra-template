@@ -1,0 +1,55 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: ${parent_kustomization:=${helm_releaseName}}--values
+spec:
+  dependsOn: []
+  patches:
+  # This patches are needed to make sure that only related value files applied by this kustomization
+    - patch: |-
+        - op: add
+          path: /metadata/annotations/kustomize.toolkit.fluxcd.io~1ssa
+          value: Ignore
+      target:
+        kind: ConfigMap
+        name: values-.*
+    # - patch: |-
+    #     - op: add
+    #       path: /metadata/namespace
+    #       value: flux-system
+    #   target:
+    #     kind: ConfigMap
+    - patch: |-
+        - op: replace
+          path: /metadata/annotations/kustomize.toolkit.fluxcd.io~1ssa
+          value: Merge
+      target:
+        kind: ConfigMap
+        name: values-${helm_releaseName}
+  # detect drift and undo kubectl edits every minute
+  interval: 1m0s
+  # wait for all applied resources to become ready
+  wait: true
+  # give up waiting after three minutes
+  timeout: 3m0s
+  # retry every two minutes on apply or waiting failures
+  retryInterval: 2m0s
+  # remove stale resources from cluster
+  prune: true
+  # enable this to recreate resources on immutable fields changes
+  force: false
+  # set the namespace for all resources
+  targetNamespace: flux-system
+  path: ./flux/clusters/_values
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: vars-${helm_releaseName}
+        optional: true
+      - kind: Secret
+        name: secrets-${helm_releaseName}
+        optional: true
+  # The components paths must be local and relative to the path specified by .spec.path  
+  components:
+    - ../../${flux_git_path_to_root_from_clusters_dir}${flux_git_repo_path_base}/clusters/${cluster_location}/_values
+    - ../../${flux_git_path_to_root_from_clusters_dir}${flux_git_repo_path_base}/clusters/${cluster_location}/${cluster_name}/_values

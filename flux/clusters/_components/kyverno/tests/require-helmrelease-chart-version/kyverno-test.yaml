@@ -1,0 +1,24 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: require-helmrelease-chart-version
+policies:
+  - ../../ValidatingPolicy-cluster-require-helmrelease-chart-version.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: require-helmrelease-chart-version
+    isValidatingPolicy: true
+    kind: HelmRelease
+    resources: [flux-system/pinned, flux-system/pinned-v-prefix, flux-system/pinned-prerelease]
+    result: pass
+  - policy: require-helmrelease-chart-version
+    isValidatingPolicy: true
+    kind: HelmRelease
+    resources: [flux-system/no-version, flux-system/star, flux-system/range, flux-system/wildcard-minor]
+    result: fail
+  - policy: require-helmrelease-chart-version
+    isValidatingPolicy: true
+    kind: HelmRelease
+    resources: [flux-system/git-source, flux-system/chart-ref]
+    result: skip

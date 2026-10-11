@@ -1,0 +1,6 @@
+helm_releaseName=cert-manager
+target_namespace=cert-manager
+source_repositoryUrl=https://charts.jetstack.io
+source_repositoryName=cert-manager
+helm_chartName=cert-manager
+helm_chartVersion=v1.21.2

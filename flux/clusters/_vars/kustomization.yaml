@@ -1,0 +1,80 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources: []
+patches: []
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    flux-role: vars-configMap
+    reconcile.fluxcd.io/watch: Enabled
+configMapGenerator:
+  - name: vars-env
+    behavior: create
+    options:
+      labels:
+        flux-app: env
+    envs:
+      - vars-env.yaml
+  - name: vars-kyverno-policy-reporter
+    behavior: create
+    options:
+      labels:
+        flux-app: kyverno-policy-reporter
+    envs:
+      - vars-kyverno-policy-reporter.yaml
+  - name: vars-kyverno
+    behavior: create
+    options:
+      labels:
+        flux-app: kyverno
+    envs:
+      - vars-kyverno.yaml
+  - name: vars-alloy
+    behavior: create
+    options:
+      labels:
+        flux-app: alloy
+    envs:
+      - vars-alloy.yaml
+  - name: vars-loki
+    behavior: create
+    options:
+      labels:
+        flux-app: loki
+    envs:
+      - vars-loki.yaml
+  - name: vars-cert-manager
+    behavior: create
+    options:
+      labels:
+        flux-app: cert-manager
+    envs:
+      - vars-cert-manager.yaml
+  - name: vars-cilium
+    behavior: create
+    options:
+      labels:
+        flux-app: cilium
+    envs:
+      - vars-cilium.yaml
+  - name: vars-external-dns
+    behavior: create
+    options:
+      labels:
+        flux-app: external-dns
+    envs:
+      - vars-external-dns.yaml
+  - name: vars-postgres-operator
+    behavior: create
+    options:
+      labels:
+        flux-app: postgres-operator
+    envs:
+      - vars-postgres-operator.yaml
+  - name: vars-prometheus-stack
+    behavior: create
+    options:
+      labels:
+        flux-app: prometheus-stack
+    envs:
+      - vars-prometheus-stack.yaml

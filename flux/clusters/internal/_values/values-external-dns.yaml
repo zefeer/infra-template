@@ -1,0 +1,79 @@
+# Request and limits for external-dns container
+resources:
+  requests:
+    memory: "159Mi"
+    cpu: "17m"
+  limits:
+    memory: "159Mi"
+
+domainFilters:
+  - example.com
+policy: upsert-only
+provider:
+  name: webhook
+  webhook:
+    image:
+      repository: renanqts/external-dns-openwrt-webhook
+      tag: v0.1.0
+    livenessProbe:
+      httpGet:
+        path: /ping
+        port: 8888
+      initialDelaySeconds: 10
+      timeoutSeconds: 5
+    readinessProbe:
+      httpGet:
+        path: /ping
+        port: 8888
+      initialDelaySeconds: 10
+      timeoutSeconds: 5
+    resources:
+      requests:
+        memory: "100Mi"
+        cpu: "10m"
+      limits:
+        memory: "100Mi"
+    # The following values are set to the default values
+    env:
+      # - name: SHUTDOWN_TIMEOUT_SECONDS
+      #   value: "5"
+      - name: LOG_LEVEL
+        value: info
+      # - name: LOG_STACK_TRACE
+      #   value: "false"
+      # - name: LOG_ENCODING
+      #   value: json
+      - name: ROUTER_HEALTHCHECK_INTERVAL
+        value: /ping
+      - name: ROUTER_HEALTHCHECK_PORT
+        value: "8888"
+      # - name: ROUTER_GIN_RELEASE_MODE
+      #   value: "true"
+      - name: PROVIDER_OPENWRT_LUCIRPC_HOSTNAME
+        value: "openwrt.example.com"
+      # - name: PROVIDER_OPENWRT_LUCIRPC_PORT
+      #   value: "443"
+      # - name: PROVIDER_OPENWRT_LUCIRPC_SSL
+      #   value: "true"
+      # - name: PROVIDER_OPENWRT_LUCIRPC_RPC_ID
+      #   value: "1"
+      # - name: PROVIDER_OPENWRT_LUCIRPC_TIMEOUT
+      #   value: "15"
+      - name: PROVIDER_OPENWRT_LUCIRPC_INSECURE_SKIP_VERIFY
+        value: "true"
+      - name: PROVIDER_OPENWRT_LUCIRPC_AUTH_USERNAME
+        valueFrom:
+          secretKeyRef:
+            name: openwrt
+            key: username
+      - name: PROVIDER_OPENWRT_LUCIRPC_AUTH_PASSWORD
+        valueFrom:
+          secretKeyRef:
+            name: openwrt
+            key: password
+# registry: noop
+sources:
+  - gateway-httproute
+txtOwnerId: k8s-${cluster_name}
+txtPrefix: ext-dns-${cluster_name}-
+# txtSuffix: ""

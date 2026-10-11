@@ -1,0 +1,7 @@
+helm_releaseName=prometheus-stack
+target_namespace=monitoring
+source_repositoryUrl=https://prometheus-community.github.io/helm-charts
+source_repositoryName=prometheus-community
+helm_chartName=kube-prometheus-stack
+# helm_chartInstallCRDs=CreateReplace
+helm_chartVersion=92.3.0

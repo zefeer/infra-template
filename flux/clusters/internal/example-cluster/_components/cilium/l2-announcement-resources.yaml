@@ -1,0 +1,22 @@
+# Apply after Cilium is installed with l2announcements.enabled: true
+#   kubectl apply -f l2-announcement-resources.yaml
+#
+# CHANGE-ME: pick a range of unused IPs on your LAN (192.168.1.10 is the k8s API
+# server, so keep this range separate from that and from DHCP).
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumLoadBalancerIPPool
+metadata:
+  name: gateway-pool
+spec:
+  blocks:
+    - cidr: "192.168.1.240/28" # 192.168.1.240 - 192.168.1.255
+---
+apiVersion: "cilium.io/v2alpha1"
+kind: CiliumL2AnnouncementPolicy
+metadata:
+  name: gateway-l2-policy
+spec:
+  loadBalancerIPs: true
+  interfaces:
+    - ^eth[0-9]+
+  nodeSelector: {}

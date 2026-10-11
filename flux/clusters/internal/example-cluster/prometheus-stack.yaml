@@ -1,0 +1,28 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: prometheus-stack
+spec:
+  dependsOn: []
+  patches:
+    - patch: |-
+        - op: add
+          path: /metadata/labels
+          value: {"gateway-access":"true"}
+      target:
+        kind: Namespace
+  components:
+    - ../../${flux_git_path_to_root_from_clusters_dir}${flux_git_repo_path_base}/clusters/${cluster_location}/_components/prometheus-stack
+  interval: ${reconcilation_for_ks:="10m0s"}
+  path: ./flux/base/_template-helm
+  prune: true
+  postBuild:
+    substitute:
+      parent_kustomization: prometheus-stack # Current Kustomization name
+    substituteFrom:
+      - kind: ConfigMap
+        name: vars-prometheus-stack
+        optional: true
+      - kind: Secret
+        name: secrets-prometheus-stack
+        optional: true

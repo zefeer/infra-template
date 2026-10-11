@@ -1,0 +1,42 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: cilium-exception
+policies:
+  - ../../ValidatingPolicy-cluster-disallow-host-namespaces.yaml
+  - ../../ValidatingPolicy-cluster-disallow-privileged-containers.yaml
+exceptions:
+  - ../../PolicyException-cilium.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: disallow-host-namespaces
+    isValidatingPolicy: true
+    kind: Pod
+    resources: [kube-system/cilium-agent]
+    result: skip
+  - policy: disallow-privileged-containers
+    isValidatingPolicy: true
+    kind: Pod
+    resources: [kube-system/cilium-agent]
+    result: skip
+  - policy: disallow-host-namespaces
+    isValidatingPolicy: true
+    kind: DaemonSet
+    resources: [kube-system/cilium]
+    result: skip
+  - policy: disallow-privileged-containers
+    isValidatingPolicy: true
+    kind: DaemonSet
+    resources: [kube-system/cilium]
+    result: skip
+  - policy: disallow-host-namespaces
+    isValidatingPolicy: true
+    kind: Pod
+    resources: [default/fake-cilium, kube-system/other-system-pod]
+    result: fail
+  - policy: disallow-privileged-containers
+    isValidatingPolicy: true
+    kind: Pod
+    resources: [default/fake-cilium, kube-system/other-system-pod]
+    result: fail

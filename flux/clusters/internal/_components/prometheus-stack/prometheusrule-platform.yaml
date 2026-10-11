@@ -1,0 +1,132 @@
+## Platform-wide resource alerts. Reasoning: docs/observability.md
+##
+## These conditions are identical for every workload in the cluster, so they are
+## declared once here rather than duplicated per service.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: platform-resources
+  namespace: monitoring
+  annotations:
+    # $labels / $value are Go template vars, not Flux substitutions
+    kustomize.toolkit.fluxcd.io/substitute: disabled
+spec:
+  groups:
+    - name: platform.memory
+      rules:
+        - alert: ContainerOOMKilled
+          # A restart in the recent past whose last termination reason was OOM.
+          # last_terminated_reason alone stays 1 for the life of the pod, so it
+          # is gated on a fresh restart to keep the firing window bounded.
+          expr: |
+            increase(kube_pod_container_status_restarts_total[15m]) > 0
+              and on (namespace, pod, container)
+            kube_pod_container_status_last_terminated_reason{reason="OOMKilled"} == 1
+          for: 0m
+          labels:
+            severity: critical
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} container {{ $labels.container }} was OOMKilled"
+            description: >-
+              The container exceeded its memory limit and was killed. Either the
+              limit is too low for what the workload actually needs, or the
+              workload is leaking.
+
+        - alert: ContainerMemoryLeaking
+          # A threshold alert is useless against a fast leak: measured with an
+          # 8MB/10s allocator against a 256Mi limit, containers spent only
+          # 30-60 seconds above 90% before being OOMKilled, so a 10m "for"
+          # window never elapsed. This one alerts on the trend instead - "at the
+          # current growth rate this container reaches its limit within an
+          # hour" - which fires while there is still time to do something.
+          #
+          # The "> 0.5 of the limit" guard is not decoration: without it a
+          # freshly started container ramping from 0 to its baseline looks like
+          # runaway growth to predict_linear, and every rollout pages someone.
+          # Verified - the first version of this rule fired on a healthy pod
+          # two minutes after a restart.
+          expr: |
+            (
+              predict_linear(
+                container_memory_working_set_bytes{container!=""}[30m], 3600
+              )
+                > on (namespace, pod, container)
+              max by (namespace, pod, container) (
+                kube_pod_container_resource_limits{resource="memory", container!=""}
+              )
+            )
+              and on (namespace, pod, container)
+            (
+              max by (namespace, pod, container) (
+                container_memory_working_set_bytes{container!=""}
+              )
+                / on (namespace, pod, container)
+              max by (namespace, pod, container) (
+                kube_pod_container_resource_limits{resource="memory", container!=""}
+              )
+                > 0.5
+            )
+          # 2m, not 10m. Measured: with a 12MB/min leak the whole window between
+          # crossing the 50% guard and being OOMKilled was 10m03s, so a 10m "for"
+          # left three seconds of warning. The 30m regression window already
+          # smooths the signal; a long "for" on top of it is pure delay.
+          for: 2m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} container {{ $labels.container }} is on track to hit its memory limit within the hour"
+            description: >-
+              Extrapolated from the last 30 minutes of growth. Catches leaks
+              early; ContainerMemoryNearLimit only catches a container already
+              sitting near its ceiling, and ContainerOOMKilled only reports the
+              funeral.
+
+        - alert: ContainerMemoryNearLimit
+          expr: |
+            max by (namespace, pod, container) (
+              container_memory_working_set_bytes{container!=""}
+            )
+              /
+            max by (namespace, pod, container) (
+              kube_pod_container_resource_limits{resource="memory", container!=""}
+            )
+              > 0.9
+          for: 10m
+          labels:
+            severity: warning
+          annotations:
+            summary: "{{ $labels.namespace }}/{{ $labels.pod }} container {{ $labels.container }} is at {{ $value | humanizePercentage }} of its memory limit"
+            description: >-
+              Warns before the OOMKill rather than after it. Containers without
+              a memory limit produce no series here and cannot be covered.
+
+    - name: platform.gitops
+      rules:
+        - alert: FluxResourceNotReady
+          # Ready is also "Unknown" briefly during a normal reconcile, hence the
+          # 15m window rather than alerting on "False" alone. Suspended
+          # resources are excluded: suspension is a deliberate act.
+          expr: |
+            gotk_resource_info{ready!="True", suspended!="true"} == 1
+          for: 15m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Flux {{ $labels.customresource_kind }}/{{ $labels.name }} has not been Ready for 15m"
+            description: >-
+              GitOps has stopped converging for this resource: what is in the
+              cluster no longer matches what is in git, and nothing will fix it
+              on its own. Requires kube-state-metrics custom resource state,
+              since Flux itself exposes no per-resource readiness metric.
+
+        - alert: FluxResourceSuspended
+          expr: |
+            gotk_resource_info{suspended="true"} == 1
+          for: 1h
+          labels:
+            severity: warning
+          annotations:
+            summary: "Flux {{ $labels.customresource_kind }}/{{ $labels.name }} has been suspended for an hour"
+            description: >-
+              Suspended resources are not reconciled at all. Usually this is
+              left over from debugging and was never resumed.

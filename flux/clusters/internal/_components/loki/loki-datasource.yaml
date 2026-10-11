@@ -1,0 +1,13 @@
+## Grafana datasource provisioning file, mounted by the Grafana sidecar.
+## Design notes: docs/observability.md
+apiVersion: 1
+datasources:
+  - name: Loki
+    type: loki
+    uid: loki
+    access: proxy
+    # Single-binary Service; the nginx gateway is disabled
+    url: http://loki.monitoring.svc.cluster.local:3100
+    isDefault: false
+    jsonData:
+      maxLines: 1000

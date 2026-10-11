@@ -1,0 +1,5 @@
+serviceMonitor:
+  # -- If `true`, create a `ServiceMonitor` resource to support the _Prometheus Operator_.
+  enabled: true
+  labels:
+    release: prometheus-stack

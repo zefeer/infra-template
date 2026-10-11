@@ -1,0 +1,361 @@
+## kube-prometheus-stack for the k3d case-study cluster.
+## Design notes: docs/observability.md
+
+## --- k3s: control-plane components expose no scrapeable metrics ---
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+kubeEtcd:
+  enabled: false
+
+defaultRules:
+  create: true
+  rules:
+    etcd: false
+    kubeControllerManager: false
+    kubeSchedulerAlerts: false
+    kubeSchedulerRecording: false
+    kubeProxy: false
+    # 30d evaluation windows, meaningless against 24h retention
+    kubeApiserverAvailability: false
+    kubeApiserverBurnrate: false
+    kubeApiserverSlos: false
+  disabled:
+    # No ntp inside the k3d node
+    NodeClockNotSynchronising: true
+    NodeClockSkewDetected: true
+
+## --- Prometheus ---
+prometheus:
+  route:
+    main:
+      enabled: true
+      hostnames:
+        - prometheus.monitoring.example.com
+      parentRefs:
+        - name: shared-gateway
+          namespace: kube-system
+  prometheusSpec:
+    scrapeInterval: 30s
+    evaluationInterval: 30s
+    retention: 24h
+    retentionSize: 4GB
+
+    # Empty selectors: discover ServiceMonitor/PodMonitor/PrometheusRule/Probe
+    # objects in any namespace, regardless of release label
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    probeSelectorNilUsesHelmValues: false
+    scrapeConfigSelectorNilUsesHelmValues: false
+
+    # Added to every series
+    externalLabels:
+      cluster: devops-cs
+
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 5Gi
+
+    resources:
+      requests:
+        cpu: 100m
+        memory: 512Mi
+      limits:
+        memory: 1500Mi
+
+## --- Alertmanager ---
+## Routing/receivers stay at chart defaults (everything -> "null" receiver).
+alertmanager:
+  enabled: true
+  alertmanagerSpec:
+    retention: 72h
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: local-path
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 1Gi
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        memory: 128Mi
+  route:
+    main:
+      enabled: true
+      hostnames:
+        - am.monitoring.example.com
+      parentRefs:
+        - name: shared-gateway
+          namespace: kube-system
+
+## --- Grafana ---
+grafana:
+  enabled: true
+
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+        - matchExpressions:
+          - key: kubernetes.io/arch
+            operator: In
+            values:
+            - amd64
+
+  defaultDashboardsEnabled: true
+  defaultDashboardsTimezone: browser
+
+  # Dashboards and datasources are provisioned from git, so Grafana is stateless
+  persistence:
+    enabled: false
+
+  route:
+    main:
+      # -- Enables or disables the route
+      enabled: true
+
+      # -- Set the route apiVersion, e.g. gateway.networking.k8s.io/v1 or gateway.networking.k8s.io/v1alpha2
+      apiVersion: gateway.networking.k8s.io/v1
+      # -- Set the route kind
+      # Valid options are GRPCRoute, HTTPRoute, TCPRoute, TLSRoute, UDPRoute
+      kind: HTTPRoute
+
+      annotations: {}
+      labels: {}
+
+      hostnames:
+        - grafana.monitoring.example.com
+      # - my-filter.example.com
+      parentRefs:
+        - name: shared-gateway
+          namespace: kube-system
+      # - name: acme-gw
+
+      matches:
+        - path:
+            type: PathPrefix
+            value: /
+
+      ## Timeouts define the timeouts that can be configured for an HTTP request.
+      ## Ref. https://gateway-api.sigs.k8s.io/api-types/httproute/#timeouts-optional
+      timeouts: {}
+      # request: 10s
+      # backendRequest: 5s
+
+      ## SessionPersistence defines and configures session persistence for the route rule.
+      ## Ref. https://gateway-api.sigs.k8s.io/geps/gep-1619/
+      sessionPersistence: {}
+      # sessionName: grafana-session
+      # type: Cookie
+      # absoluteTimeout: 48h
+      # cookieConfig:
+      #   lifetimeType: Permanent
+
+      ## Filters define the filters that are applied to requests that match this rule.
+      filters: []
+
+      ## Additional custom rules that can be added to the route
+      additionalRules: []
+
+      ## httpsRedirect adds a filter for redirecting to https (HTTP 301 Moved Permanently).
+      ## To redirect HTTP traffic to HTTPS, you need to have a Gateway with both HTTP and HTTPS listeners.
+      ## Matches and filters do not take effect if enabled.
+      ## Ref. https://gateway-api.sigs.k8s.io/guides/http-redirect-rewrite/
+      httpsRedirect: false
+
+  sidecar:
+    # Any ConfigMap labelled grafana_dashboard="1", in any namespace, holding
+    # dashboard JSON. Annotation grafana_folder=<name> selects the folder.
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      labelValue: "1"
+      searchNamespace: ALL
+      folderAnnotation: grafana_folder
+      provider:
+        foldersFromFilesStructure: true
+    # Same mechanism for datasources; see infrastructure/configs
+    datasources:
+      enabled: true
+      label: grafana_datasource
+      labelValue: "1"
+      searchNamespace: ALL
+
+  grafana.ini:
+    # Traefik is disabled in this cluster; access is via port-forward
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer
+    users:
+      default_theme: dark
+    plugins:
+      # Grafana 13 preinstalls five bundled apps. Logs Drilldown
+      # (grafana-lokiexplore-app) is the one worth keeping - queryless log
+      # exploration on top of Loki - so it is left loaded and the other four
+      # are not. They cost ~180Mi between them; Logs Drilldown costs ~5Mi.
+      #
+      # disable_plugins is the lever that works here. Two that do not:
+      #   - [plugins] preinstall ADDS to the built-in list, it does not replace
+      #     it, so it cannot be used to narrow the set;
+      #   - GF_INSTALL_PLUGINS is ignored by the -distroless image, which has no
+      #     entrypoint script to process it.
+      # The four are still downloaded at startup, just never loaded.
+      disable_plugins: grafana-advisor-app,grafana-metricsdrilldown-app,grafana-pyroscope-app,grafana-exploretraces-app
+
+  # Measured: ~350-450Mi idle, with bursts to 760Mi+ when dashboards are opened.
+  # Two OOMKills got us here - 256Mi died on boot, 768Mi died under load after
+  # 20 minutes - so the limit carries ~2x headroom over the observed peak and
+  # the request covers the real idle baseline.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 512Mi
+    limits:
+      memory: 1536Mi
+
+  serviceMonitor:
+    enabled: true
+
+## --- Exporters and operator ---
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 64Mi
+    limits:
+      memory: 192Mi
+
+  # kube-state-metrics must be able to read the Flux CRs it reports on.
+  rbac:
+    extraRules:
+      - apiGroups:
+          - kustomize.toolkit.fluxcd.io
+          - helm.toolkit.fluxcd.io
+          - source.toolkit.fluxcd.io
+        resources: ["*"]
+        verbs: ["list", "watch"]
+
+  # Flux v2.9 controllers expose reconcile duration and per-controller errors,
+  # but no per-resource readiness - gotk_reconcile_condition was removed. The
+  # supported way to get "is this Kustomization Ready" into Prometheus is to
+  # have kube-state-metrics read the CRs directly, which is what this does.
+  # Produces gotk_resource_info{customresource_kind, name, ready, suspended} = 1.
+  customResourceState:
+    enabled: true
+    config:
+      spec:
+        resources:
+          - groupVersionKind:
+              group: kustomize.toolkit.fluxcd.io
+              version: v1
+              kind: Kustomization
+            metricNamePrefix: gotk
+            metrics:
+              - name: resource_info
+                help: "State of a Flux Kustomization, carried as labels."
+                each:
+                  type: Info
+                  info:
+                    labelsFromPath:
+                      name: [metadata, name]
+                labelsFromPath:
+                  exported_namespace: [metadata, namespace]
+                  ready: [status, conditions, "[type=Ready]", status]
+                  suspended: [spec, suspend]
+          - groupVersionKind:
+              group: helm.toolkit.fluxcd.io
+              version: v2
+              kind: HelmRelease
+            metricNamePrefix: gotk
+            metrics:
+              - name: resource_info
+                help: "State of a Flux HelmRelease, carried as labels."
+                each:
+                  type: Info
+                  info:
+                    labelsFromPath:
+                      name: [metadata, name]
+                labelsFromPath:
+                  exported_namespace: [metadata, namespace]
+                  ready: [status, conditions, "[type=Ready]", status]
+                  suspended: [spec, suspend]
+          - groupVersionKind:
+              group: source.toolkit.fluxcd.io
+              version: v1
+              kind: GitRepository
+            metricNamePrefix: gotk
+            metrics:
+              - name: resource_info
+                help: "State of a Flux GitRepository, carried as labels."
+                each:
+                  type: Info
+                  info:
+                    labelsFromPath:
+                      name: [metadata, name]
+                labelsFromPath:
+                  exported_namespace: [metadata, namespace]
+                  ready: [status, conditions, "[type=Ready]", status]
+                  suspended: [spec, suspend]
+          - groupVersionKind:
+              group: source.toolkit.fluxcd.io
+              version: v1
+              kind: HelmRepository
+            metricNamePrefix: gotk
+            metrics:
+              - name: resource_info
+                help: "State of a Flux HelmRepository, carried as labels."
+                each:
+                  type: Info
+                  info:
+                    labelsFromPath:
+                      name: [metadata, name]
+                labelsFromPath:
+                  exported_namespace: [metadata, namespace]
+                  ready: [status, conditions, "[type=Ready]", status]
+                  suspended: [spec, suspend]
+          - groupVersionKind:
+              group: source.toolkit.fluxcd.io
+              version: v1
+              kind: HelmChart
+            metricNamePrefix: gotk
+            metrics:
+              - name: resource_info
+                help: "State of a Flux HelmChart, carried as labels."
+                each:
+                  type: Info
+                  info:
+                    labelsFromPath:
+                      name: [metadata, name]
+                labelsFromPath:
+                  exported_namespace: [metadata, namespace]
+                  ready: [status, conditions, "[type=Ready]", status]
+                  suspended: [spec, suspend]
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
+
+prometheusOperator:
+  resources:
+    requests:
+      cpu: 25m
+      memory: 96Mi
+    limits:
+      memory: 256Mi

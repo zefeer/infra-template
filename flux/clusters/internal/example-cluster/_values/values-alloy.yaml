@@ -1,0 +1,24 @@
+## grafana/alloy 1.12.1 - log collection for Loki.
+## Design notes: docs/observability.md
+
+controller:
+  type: daemonset
+
+alloy:
+  # Pipeline lives in config.alloy, mounted from the alloy-config ConfigMap.
+  # The chart's config-reloader sidecar picks up changes without a restart.
+  configMap:
+    create: false
+    name: alloy-config
+    key: config.alloy
+
+  resources:
+    requests:
+      cpu: 50m
+      memory: 96Mi
+    limits:
+      memory: 256Mi
+
+## Alloy's own metrics: dropped logs and push failures
+serviceMonitor:
+  enabled: true

@@ -1,0 +1,8 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
+metadata:
+  name: ${target_namespace}-${source_repositoryName}
+spec: 
+  interval: ${source_repositoryRefreshInterval:=1h0m0s}
+  url: ${source_repositoryUrl}
+  type: ${source_repositoryType:=default}

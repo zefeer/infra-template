@@ -1,0 +1,39 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+
+generatorOptions:
+  # Stable names: alloy-config is referenced by the Alloy chart's volume mount
+  disableNameSuffixHash: true
+  annotations:
+    # Alloy relabel rules and Grafana provisioning both use $-syntax that Flux
+    # postBuild envsubst would eat
+    kustomize.toolkit.fluxcd.io/substitute: disabled
+
+configMapGenerator:
+
+  # Health of the platform itself: Flux controllers and the monitoring stack.
+  - name: grafana-dashboard-platform-status
+    namespace: monitoring
+    behavior: create
+    options:
+      labels:
+        grafana_dashboard: "1"
+        flux-app: dashboards
+      annotations:
+        grafana_folder: Platform
+    files:
+      - dashboards/platform-status.json
+
+  # Alertmanager webhook receiver, mounted by the alert-logger Deployment
+  - name: alert-logger-script
+    namespace: monitoring
+    behavior: create
+    options:
+      labels:
+        flux-app: alert-logger
+    files:
+      - alert-logger.py
+
+resources:
+  - prometheusrule-platform.yaml
+  - alert-logger.yaml

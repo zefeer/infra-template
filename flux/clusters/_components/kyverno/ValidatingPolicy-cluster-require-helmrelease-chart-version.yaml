@@ -1,0 +1,40 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: require-helmrelease-chart-version
+  annotations:
+    policies.kyverno.io/title: Require pinned chart versions in HelmReleases
+    policies.kyverno.io/category: Supply Chain
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: HelmRelease
+    policies.kyverno.io/description: >-
+      spec.chart.spec.version defaults to "*", so helm-controller upgrades to whatever chart
+      the repository publishes next, without a commit in Git. A semver range ("1.x", ">=1.0")
+      has the same effect. Charts from a HelmRepository must be pinned to an exact version.
+      GitRepository and Bucket sources ignore the field (the Git ref pins the chart), and
+      chartRef releases keep the version in the referenced source, so neither is checked.
+spec:
+  validationActions:
+    - Audit
+    - Deny
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [helm.toolkit.fluxcd.io]
+        apiVersions: [v2]
+        operations: [CREATE, UPDATE]
+        resources: [helmreleases]
+  matchConditions:
+    - name: chart-from-helm-repository
+      expression: >-
+        has(object.spec.chart) &&
+        object.spec.chart.spec.sourceRef.kind == 'HelmRepository'
+  variables:
+    - name: version
+      expression: object.spec.chart.spec.?version.orValue('')
+  validations:
+    # Exact semver with optional "v", pre-release and build metadata: 1.2.3, v26.7.1, 1.0.0-rc.1
+    - expression: >-
+        variables.version.matches(r'^v?[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.+-]+)?$')
+      messageExpression: >-
+        'spec.chart.spec.version must be an exact chart version, got "' + variables.version +
+        '"; set helm_chartVersion in the app Kustomization or its vars ConfigMap'

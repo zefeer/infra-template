@@ -1,0 +1,40 @@
+apiVersion: policies.kyverno.io/v1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-latest-tag
+  annotations:
+    policies.kyverno.io/title: Disallow latest and untagged images
+    policies.kyverno.io/category: Supply Chain
+    policies.kyverno.io/severity: medium
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      Flux reconciles this cluster from Git, so what runs must be reproducible from Git.
+      An image without a tag or with ":latest" can change under the same manifest on any
+      pod restart. Every container image must be pinned to an explicit tag or a digest.
+spec:
+  validationActions:
+    - Audit
+    - Deny
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  variables:
+    - name: images
+      expression: >-
+        object.spec.containers.map(c, c.image) +
+        (has(object.spec.initContainers) ? object.spec.initContainers.map(c, c.image) : []) +
+        (has(object.spec.ephemeralContainers) ? object.spec.ephemeralContainers.map(c, c.image) : [])
+    # The tag is after the last ":" of the last path segment; a ":" before it is a registry port
+    - name: unpinned
+      expression: >-
+        variables.images.filter(img, !img.contains('@') && (
+          !img.substring(img.lastIndexOf('/') + 1).contains(':') ||
+          img.endsWith(':latest')))
+  validations:
+    - expression: size(variables.unpinned) == 0
+      messageExpression: >-
+        'images must be pinned to a tag other than "latest" or to a digest: ' +
+        variables.unpinned.join(', ')

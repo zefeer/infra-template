@@ -1,0 +1,30 @@
+---
+# Source: kyverno-policies/templates/baseline/disallow-host-process.cel.yaml
+apiVersion: policies.kyverno.io/v1beta1
+kind: ValidatingPolicy
+metadata:
+  name: disallow-host-process
+  annotations:
+    policies.kyverno.io/title: Disallow HostProcess
+    policies.kyverno.io/category: Pod Security Standards (Baseline)
+    policies.kyverno.io/severity: "medium"
+    policies.kyverno.io/subject: Pod
+    kyverno.io/kyverno-version: v1.19.1
+    kyverno.io/kubernetes-version: ">=1.25.0-0"
+    policies.kyverno.io/description: >-
+      HostProcess containers can access the host and should not be allowed. This policy ensures the `hostProcess` field is unset or set to `false`.
+spec:
+  failurePolicy: Fail
+  matchConstraints:
+    resourceRules:
+      - apiGroups: [""]
+        apiVersions: [v1]
+        operations: [CREATE, UPDATE]
+        resources: [pods]
+  validations:
+    - expression: "(!has(object.spec.securityContext) || \n !has(object.spec.securityContext.windowsOptions) || \n !has(object.spec.securityContext.windowsOptions.hostProcess) || \n object.spec.securityContext.windowsOptions.hostProcess == false) &&\n(!has(object.spec.containers) || object.spec.containers.all(c, \n  !has(c.securityContext) || \n  !has(c.securityContext.windowsOptions) || \n  !has(c.securityContext.windowsOptions.hostProcess) || \n  c.securityContext.windowsOptions.hostProcess == false)) &&\n(!has(object.spec.initContainers) || object.spec.initContainers.all(c, \n  !has(c.securityContext) || \n  !has(c.securityContext.windowsOptions) || \n  !has(c.securityContext.windowsOptions.hostProcess) || \n  c.securityContext.windowsOptions.hostProcess == false)) &&\n(!has(object.spec.ephemeralContainers) || object.spec.ephemeralContainers.all(c, \n  !has(c.securityContext) || \n  !has(c.securityContext.windowsOptions) || \n  !has(c.securityContext.windowsOptions.hostProcess) || \n  c.securityContext.windowsOptions.hostProcess == false))"
+      message: >-
+        HostProcess containers are disallowed. The fields spec.securityContext.windowsOptions.hostProcess, spec.containers[*].securityContext.windowsOptions.hostProcess, spec.initContainers[*].securityContext.windowsOptions.hostProcess, and spec.ephemeralContainers[*].securityContext.windowsOptions.hostProcess must be unset or set to `false`.
+  validationActions:
+    - Audit
+    - Deny

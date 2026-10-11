@@ -1,0 +1,5 @@
+features:
+  policyExceptions:
+    enabled: true
+    # An exception switches policies off, so only the Flux-managed kyverno namespace may hold them
+    namespace: ${target_namespace:="kyverno"}

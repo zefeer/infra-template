@@ -1,0 +1,28 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: kyverno-policy-reporter
+spec:
+  dependsOn:
+    - name: kyverno
+  patches:
+    - patch: |-
+        - op: add
+          path: /metadata/labels
+          value: {"gateway-access":"true"}
+      target:
+        kind: Namespace
+  components: []
+  interval: ${reconcilation_for_ks:="10m0s"}
+  postBuild:
+    substitute:
+      parent_kustomization: kyverno-policy-reporter # Current Kustomization name
+    substituteFrom:
+      - kind: ConfigMap
+        name: vars-kyverno-policy-reporter
+        optional: true
+      - kind: Secret
+        name: secrets-kyverno-policy-reporter
+        optional: true
+  path: ./flux/base/_template-helm
+  prune: true

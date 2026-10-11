@@ -1,0 +1,7 @@
+helm_releaseName=postgres-operator
+target_namespace=postgres-operator
+source_repositoryUrl=oci://registry.developers.crunchydata.com/crunchydata/
+source_repositoryType=oci
+source_repositoryName=pgo-helm-oci
+helm_chartName=pgo
+helm_chartVersion=6.0.3

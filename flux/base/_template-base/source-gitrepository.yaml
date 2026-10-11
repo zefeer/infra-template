@@ -1,0 +1,9 @@
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: GitRepository
+metadata:
+  name: ${target_namespace}-${source_repositoryName}
+spec:
+  url: ${source_repositoryUrl}
+  interval: ${source_repositoryRefreshInterval:=1h0m0s}
+  ref:
+    branch: ${source_repositoryGitBranch:=main}

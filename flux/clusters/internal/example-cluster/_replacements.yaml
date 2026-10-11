@@ -1,0 +1,150 @@
+- source:
+    group: kustomize.toolkit.fluxcd.io
+    kind: Kustomization
+    fieldPath: metadata.name
+    name: cert-manager
+  targets:
+    - fieldPaths:
+        - spec.patches.[patch=.*Merge.*].target.name
+      select:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        name: cert-manager
+      options:
+        delimiter: '-'
+        index: 1
+- source:
+    group: kustomize.toolkit.fluxcd.io
+    kind: Kustomization
+    fieldPath: metadata.name
+    name: cilium
+  targets:
+    - fieldPaths:
+        - spec.patches.[patch=.*Merge.*].target.name
+      select:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        name: cilium
+      options:
+        delimiter: '-'
+        index: 1
+- source:
+    group: kustomize.toolkit.fluxcd.io
+    kind: Kustomization
+    fieldPath: metadata.name
+    name: postgres-operator
+  targets:
+    - fieldPaths:
+        - spec.patches.[patch=.*Merge.*].target.name
+      select:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        name: postgres-operator
+      options:
+        delimiter: '-'
+        index: 1
+- source:
+    group: kustomize.toolkit.fluxcd.io
+    kind: Kustomization
+    fieldPath: metadata.name
+    name: external-dns
+  targets:
+    - fieldPaths:
+        - spec.patches.[patch=.*Merge.*].target.name
+      select:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        name: external-dns
+      options:
+        delimiter: '-'
+        index: 1
+- source:
+    group: kustomize.toolkit.fluxcd.io
+    kind: Kustomization
+    fieldPath: metadata.name
+    name: prometheus-stack
+  targets:
+    - fieldPaths:
+        - spec.patches.[patch=.*Merge.*].target.name
+      select:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        name: prometheus-stack
+      options:
+        delimiter: '-'
+        index: 1
+- source:
+    group: kustomize.toolkit.fluxcd.io
+    kind: Kustomization
+    fieldPath: metadata.name
+    name: kyverno
+  targets:
+    - fieldPaths:
+        - spec.patches.[patch=.*Merge.*].target.name
+      select:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        name: kyverno
+      options:
+        delimiter: '-'
+        index: 1
+- source:
+    group: kustomize.toolkit.fluxcd.io
+    kind: Kustomization
+    fieldPath: metadata.name
+    name: kyverno-policy-reporter
+  targets:
+    - fieldPaths:
+        - spec.patches.[patch=.*Merge.*].target.name
+      select:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        name: kyverno-policy-reporter
+      options:
+        delimiter: '-'
+        index: 1
+- source:
+    group: kustomize.toolkit.fluxcd.io
+    kind: Kustomization
+    fieldPath: metadata.name
+    name: alloy
+  targets:
+    - fieldPaths:
+        - spec.patches.[patch=.*Merge.*].target.name
+      select:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        name: alloy
+      options:
+        delimiter: '-'
+        index: 1
+- source:
+    group: kustomize.toolkit.fluxcd.io
+    kind: Kustomization
+    fieldPath: metadata.name
+    name: loki
+  targets:
+    - fieldPaths:
+        - spec.patches.[patch=.*Merge.*].target.name
+      select:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        name: loki
+      options:
+        delimiter: '-'
+        index: 1
+- source:
+    group: kustomize.toolkit.fluxcd.io
+    kind: Kustomization
+    fieldPath: metadata.name
+    name: flux-system
+  targets:
+    - fieldPaths:
+        - spec.patches.[patch=.*Merge.*].target.name
+      select:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        name: flux-system
+      options:
+        delimiter: '-'
+        index: 1

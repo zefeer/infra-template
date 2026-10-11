@@ -1,0 +1,29 @@
+# Namespace comes from the component (kyverno), the only namespace allowed to hold exceptions
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: cilium
+spec:
+  policyRefs:
+    - kind: ValidatingPolicy
+      name: disallow-host-namespaces
+    - kind: ValidatingPolicy
+      name: disallow-privileged-containers
+    - kind: ValidatingPolicy
+      name: disallow-host-path
+    - kind: ValidatingPolicy
+      name: disallow-host-ports
+    - kind: ValidatingPolicy
+      name: disallow-host-process
+  # Both conditions: the label alone can be set by anyone on any pod
+  matchConditions:
+    - name: cilium-in-kube-system
+      expression: >-
+        object.metadata.namespace == 'kube-system' &&
+        has(object.metadata.labels) &&
+        object.metadata.labels[?'app.kubernetes.io/part-of'].orValue('') == 'cilium'
+  properties:
+    reason: >-
+      CNI: the agent runs privileged to load eBPF programs and manage node networking;
+      agent, envoy and operator use hostNetwork to serve the node network namespace.
+  reportResult: skip

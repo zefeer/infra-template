@@ -1,0 +1,180 @@
+name: Flux CI
+
+on:
+  pull_request:
+    paths:
+      - 'flux/**'
+      - 'terraform/modules/common/flux_bootstrap/**'
+      - '.github/scripts/**'
+      - '.github/actions/setup-flux-tools/**'
+      - '.github/workflows/flux-ci.yaml'
+  push:
+    branches: [main]
+    paths:
+      - 'flux/**'
+      - 'terraform/modules/common/flux_bootstrap/**'
+      - '.github/scripts/**'
+      - '.github/actions/setup-flux-tools/**'
+      - '.github/workflows/flux-ci.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  FLUX_VERSION: '2.9.6' # keep in line with flux_version in terraform/internal/flux_bootstrap/*/terragrunt.hcl
+  TERRAFORM_VERSION: '1.5.7'
+  DYFF_VERSION: '1.12.0'
+  KUBECONFORM_IMAGE: ghcr.io/yannh/kubeconform:v0.6.7
+  KYVERNO_CLI_IMAGE: ghcr.io/kyverno/kyverno-cli:v1.19.1
+  KUBE_VERSION: '1.36.0' # example-cluster's k3s; charts see it in .Capabilities, kubeconform validates against it
+  CLUSTER_PATH: flux/clusters/internal/example-cluster
+
+jobs:
+  validate:
+    name: Build and validate Flux tree
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup-flux-tools
+        with:
+          flux-version: ${{ env.FLUX_VERSION }}
+          terraform-version: ${{ env.TERRAFORM_VERSION }}
+
+      - name: YAML lint
+        run: |
+          pip install --quiet yamllint
+          yamllint -c .yamllint.yaml flux/base/
+          yamllint -c .yamllint.yaml "${CLUSTER_PATH}/" --no-warnings
+
+      # Every kyverno-test.yaml under flux/: policy logic against hand-made pass/fail fixtures,
+      # including cases the real tree doesn't contain (too broad exceptions, edge cases)
+      - name: Kyverno policy tests
+        run: docker run --rm -v "$PWD":/w -w /w "$KYVERNO_CLI_IMAGE" test flux/ --remove-color
+
+      # Root Kustomization and vars-env rendered by the flux_bootstrap module itself, then the whole
+      # tree built the way kustomize-controller builds it (see the script header)
+      - name: Build Flux tree
+        run: .github/scripts/flux-build.sh "$CLUSTER_PATH" "$RUNNER_TEMP/flux-build.yaml"
+
+      # Every HelmRelease templated with the values helm-controller would give it (see the script header)
+      - name: Render HelmReleases
+        run: .github/scripts/helm-render.sh "$RUNNER_TEMP/flux-build.yaml" "$RUNNER_TEMP/helm"
+
+      # Custom resources are validated against the CRDs the tree and the charts install
+      - name: Kubeconform
+        run: .github/scripts/kubeconform.sh "$RUNNER_TEMP/flux-build.yaml" "$RUNNER_TEMP/helm"
+
+      # Policies and exceptions are taken from the built tree, i.e. exactly what the cluster would
+      # enforce. Deny policies fail the job, as the cluster would reject the objects.
+      - name: Kyverno policies against the built tree
+        run: .github/scripts/kyverno-check.sh "$RUNNER_TEMP/flux-build.yaml"
+
+      # Charts bring the real workloads (DaemonSets, Deployments of system components). Their
+      # violations are warnings for now, until the needed PolicyExceptions are in place.
+      - name: Kyverno policies against rendered charts (warnings only)
+        run: .github/scripts/kyverno-check.sh --warn-only "$RUNNER_TEMP/flux-build.yaml" "$RUNNER_TEMP/helm"
+
+      - name: Upload built tree and rendered charts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flux-build
+          path: |
+            ${{ runner.temp }}/flux-build.yaml
+            ${{ runner.temp }}/helm/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  # The PR's target, built with the PR's scripts, so the diff shows manifest changes only.
+  # If the base can't be built that way (e.g. it predates these scripts), there is just no diff.
+  build-base:
+    name: Build base for diff
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.build.outcome == 'success' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          path: base-src
+      - uses: ./.github/actions/setup-flux-tools
+        with:
+          flux-version: ${{ env.FLUX_VERSION }}
+          terraform-version: ${{ env.TERRAFORM_VERSION }}
+
+      # flux-build.sh renders root with this module; a base without it predates the scripts
+      - name: Check the base can be built with these scripts
+        id: check
+        run: |
+          if [[ -d base-src/terraform/modules/common/flux_bootstrap/modules/root_manifests ]]; then
+            echo "buildable=true" >> "$GITHUB_OUTPUT"
+          else
+            msg="No diff: the base commit predates flux_bootstrap/modules/root_manifests, so the PR's scripts can't build it."
+            echo "::notice title=Flux diff skipped::$msg"
+            echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # The scripts work on the checkout they are run from, so running them inside base-src builds the base.
+      # A broken base is not this PR's fault: it only means there is no diff, with a warning saying why.
+      - name: Build base tree and render its charts
+        id: build
+        if: steps.check.outputs.buildable == 'true'
+        continue-on-error: true
+        working-directory: base-src
+        run: |
+          ../.github/scripts/flux-build.sh "$CLUSTER_PATH" "$RUNNER_TEMP/flux-build.yaml"
+          ../.github/scripts/helm-render.sh "$RUNNER_TEMP/flux-build.yaml" "$RUNNER_TEMP/helm"
+
+      - name: Report a failed base build
+        if: steps.build.outcome == 'failure'
+        run: |
+          msg="No diff: the base commit failed to build, see the 'Build base tree and render its charts' step."
+          echo "::warning title=Flux diff skipped::$msg"
+          echo "$msg" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload base build
+        if: steps.build.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: flux-build-base
+          path: |
+            ${{ runner.temp }}/flux-build.yaml
+            ${{ runner.temp }}/helm/
+          retention-days: 7
+
+  diff:
+    name: Diff against base
+    needs: [validate, build-base]
+    if: needs.build-base.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: flux-build-base
+          path: ${{ runner.temp }}/base
+      - uses: actions/download-artifact@v4
+        with:
+          name: flux-build
+          path: ${{ runner.temp }}/head
+      - name: Install dyff
+        run: |
+          curl -sL "https://github.com/homeport/dyff/releases/download/v${DYFF_VERSION}/dyff_${DYFF_VERSION}_linux_amd64.tar.gz" |
+            sudo tar xz -C /usr/local/bin dyff
+          dyff version
+
+      # Objects added/removed/changed in the Flux tree and the rendered charts, with field-level details
+      - name: Diff
+        run: |
+          .github/scripts/flux-diff.sh "$RUNNER_TEMP/base" "$RUNNER_TEMP/head" "$RUNNER_TEMP/flux-diff/report.md"
+          cat "$RUNNER_TEMP/flux-diff/report.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload diff
+        uses: actions/upload-artifact@v4
+        with:
+          name: flux-diff
+          path: ${{ runner.temp }}/flux-diff/
+          retention-days: 7

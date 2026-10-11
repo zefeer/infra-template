@@ -1,0 +1,155 @@
+# Cilium Helm Chart values
+cluster:
+  name: dev
+
+kubeProxyReplacement: true
+ipv4:
+  enabled: true
+ipv6:
+  enabled: false
+
+k8sServiceHost: xiaomi-miatoll
+k8sServicePort: 6443
+devices: "eth0"
+
+gatewayAPI:
+  enabled: true
+  gatewayClass:
+    # -- Enable creation of GatewayClass resource
+    # The default value is 'auto' which decides according to presence of gateway.networking.k8s.io/v1/GatewayClass in the cluster.
+    # Other possible values are 'true' and 'false', which will either always or never create the GatewayClass, respectively.
+    create: "true"
+
+# Hands out LoadBalancer IPs on bare metal via ARP/NDP, so the Gateway's
+# Service gets an external IP without MetalLB. Needs a CiliumLoadBalancerIPPool
+# (+ optionally a CiliumL2AnnouncementPolicy) applied separately — see
+# l2-announcement-resources.yaml.
+l2announcements:
+  enabled: true
+
+ipam:
+  mode: cluster-pool
+  operator:
+    clusterPoolIPv4PodCIDRList: "10.42.0.0/16"  # Pods CIDR
+    clusterPoolIPv4MaskSize: 24
+
+k8s:
+  requireIPv4PodCIDR: true
+
+# -- Enable installation of PodCIDR routes between worker
+# nodes if worker nodes share a common L2 network segment.
+autoDirectNodeRoutes: true
+# -- Enable skipping of PodCIDR routes between worker
+# nodes if the worker nodes are in a different L2 network segment.
+directRoutingSkipUnreachable: true
+# -- Annotate k8s node upon initialization with Cilium's metadata.
+annotateK8sNode: true
+
+routingMode: native
+endpointRoutes:
+  enabled: true
+
+ipv4NativeRoutingCIDR: "10.42.0.0/16"  # Pods CIDR
+
+bpf:
+  tproxy: true
+  preallocateMaps: true
+  hostLegacyRouting: false
+  masquerade: true
+
+ipMasqAgent:
+  enabled: true
+  config:
+    nonMasqueradeCIDRs:
+      - 10.42.0.0/16 # Pods CIDR
+
+enableIPv4Masquerade: true
+
+encryption:
+  enabled: true
+  type: wireguard
+  nodeEncryption: true
+  strictMode:
+    enabled: true
+    cidr: "10.42.0.0/16"  # Pods CIDR
+    allowRemoteNodeIdentities: true
+
+externalIPs:
+  enabled: true
+
+nodePort:
+  enabled: true
+
+hostPort:
+  enabled: true
+
+hubble:
+  enabled: false
+  relay:
+    enabled: false
+    tls:
+      server:
+        enabled: true
+    rollOutPods: true
+    prometheus:
+      enabled: true
+      port: 9966
+      serviceMonitor:
+        # -- Enable service monitors.
+        # This requires the prometheus CRDs to be available (see https://github.com/prometheus-operator/prometheus-operator/blob/main/example/prometheus-operator-crd/monitoring.coreos.com_servicemonitors.yaml)
+        enabled: true
+        # -- Labels to add to ServiceMonitor hubble-relay
+        # labels:
+        #   release: prometheus-stack
+  ui:
+    enabled: false
+    rollOutPods: true
+  metrics:
+    enabled:
+      - dns:query;ignoreAAAA
+      - drop
+      - tcp
+      - flow
+      - icmp
+      - http
+    serviceMonitor:
+      enabled: true
+      # labels:
+      #   release: prometheus-stack
+
+rollOutCiliumPods: true
+operator:
+  rollOutPods: true
+  replicas: 1
+  prometheus:
+    # already true by default, kept explicit here
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      # labels:
+      #   release: prometheus-stack
+
+# Expose Cilium metrics for Prometheus to scrape.
+# Apply on top of the existing values.yaml, e.g.:
+#   helm upgrade cilium cilium/cilium -n kube-system -f values.yaml -f values-prometheus.yaml
+#
+# serviceMonitor.enabled requires the prometheus-operator CRDs (ServiceMonitor)
+# to already be installed in the cluster.
+
+prometheus:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    # labels:
+    #   release: prometheus-stack
+envoy:
+  enabled: true
+  prometheus:
+    # already true by default, kept explicit here
+    enabled: true
+    serviceMonitor:
+      enabled: true
+      # labels:
+      #   release: prometheus-stack
+
+upgradeCompatibility: "1.9"

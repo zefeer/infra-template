@@ -1,0 +1,171 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: "root"
+  namespace: "${flux_namespace}"
+spec:
+  force: false
+  interval: 10m0s
+  patches:
+    ## Patches subordinates Kustomizations
+    - patch: |-
+        ## Add sourceRef to the Kustomization
+        - op: add
+          path: /spec/sourceRef
+          value: {"kind": "GitRepository", "name": "${flux_namespace}", "namespace": "${flux_namespace}"}
+        ## Add values substitution from from vars-env ConfigMap
+        - op: add
+          path: /spec/postBuild/substituteFrom/0
+          value: {"kind": "ConfigMap", "name": "${env_vars_config_map_name}", "optional": true}
+        ## Add dependsOn to the Kustomization
+        - op: add
+          path: /spec/dependsOn/0
+          value: {"name": "vars"}
+        - op: add
+          path: /spec/ignoreMissingComponents
+          value: true
+      target:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+    ## Add patches to the subordinates Kustomizations
+    - patch: |-
+        - op: add
+          path: /spec/patches/-
+          value:
+            patch: |-
+              - op: add
+                path: /metadata/namespace
+                value: ${flux_namespace}
+            target:
+              kind: ${patch_target_flux_resources}
+        - op: add
+          path: /spec/patches/-
+          value:
+            patch: |-
+              - op: add
+                path: /spec/postBuild/substituteFrom/0
+                value: {"kind": "ConfigMap", "name": "${env_vars_config_map_name}", "optional": true}
+            target:
+              group: kustomize.toolkit.fluxcd.io
+              kind: Kustomization
+        - op: add
+          path: /spec/patches/-
+          value:
+            patch: |-
+              - op: add
+                path: /spec/sourceRef
+                value: {"kind": "GitRepository", "name": "${flux_namespace}", "namespace": "${flux_namespace}"}
+            target:
+              group: kustomize.toolkit.fluxcd.io
+              kind: Kustomization
+      target:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+    ## Add patch to the subordinates Kustomizations, which add patch to their subordinate Kustomizations
+    - patch: |-
+        - op: add
+          path: /spec/patches/-
+          value:
+            patch: |-
+              - op: add
+                path: /spec/patches/-
+                value:
+                  patch: |-
+                    - op: add
+                      path: /metadata/namespace
+                      value: ${flux_namespace}
+                  target:
+                    kind: ${patch_target_flux_resources}
+            target:
+              kind: Kustomization
+      target:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+    ## Add namespace to all flux resources created by this kustomization
+    - patch: |-
+        - op: add
+          path: /metadata/namespace
+          value: ${flux_namespace}
+      target:
+        kind: ${patch_target_flux_resources}
+    ## Remove dependency on vars Kustomization from vars|values Kustomization
+    - patch: |-
+        - op: remove
+          path: /spec/dependsOn
+          value: [{"name": "vars"}]
+      target:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        name: vars|values
+    ## Add flux-role label to the infra Kustomizations
+    - patch: |-
+        - op: add
+          path: /metadata/labels
+          value: {"flux-role": "infra"}
+      target:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        name: vars|values
+    ## Add _values folders as components, and make sure that only related value files are applied by kustomization. Skipped for infra Kustomizations and those without values components
+    - patch: |-
+        - op: add
+          path: /spec/components/0
+          value: "../../${flux_git_path_to_root_from_clusters_dir}${flux_git_repo_path_base}/clusters/${cluster_location}/${cluster_name}/_values"
+        - op: add
+          path: /spec/components/0
+          value: "../../${flux_git_path_to_root_from_clusters_dir}${flux_git_repo_path_base}/clusters/${cluster_location}/_values"
+        - op: add
+          path: /spec/components/0
+          value: "../../${flux_git_path_to_root_from_clusters_dir}${flux_git_repo_path_base}/clusters/_values"
+        - op: add
+          path: /spec/patches/-
+          value:
+            patch: |-
+              - op: add
+                path: /metadata/annotations/kustomize.toolkit.fluxcd.io~1ssa
+                value: Ignore
+            target:
+              kind: ConfigMap
+              name: values-.*
+        - op: add
+          path: /spec/patches/-
+          value:
+            patch: |-
+              - op: add
+                path: /metadata/annotations/kustomize.toolkit.fluxcd.io~1ssa
+                value: Merge
+            target:
+              kind: ConfigMap
+              name: values-DUMMY
+        - op: add
+          path: /spec/patches/-
+          value:
+            patch: |-
+              - op: add
+                path: /metadata/namespace
+                value: ${flux_namespace}
+            target:
+              labelSelector: "flux-role==values-configMap"
+      target:
+        group: kustomize.toolkit.fluxcd.io
+        kind: Kustomization
+        labelSelector: "flux-role!=infra, flux-component!=no_values, flux-component!=skip_values"
+  components: ${components}
+  path: ./${flux_git_repo_path_base}/clusters/${cluster_location}/${cluster_name}
+  targetNamespace: ${flux_namespace}
+  postBuild:
+    substitute:
+      var_substitution_enabled: 'true'
+    substituteFrom:
+      - kind: ConfigMap
+        name: ${env_vars_config_map_name}
+        optional: true
+  prune: ${prune}
+  retryInterval: 10m0s
+  sourceRef:
+    kind: GitRepository
+    name: ${flux_namespace}-cluster-root
+    namespace: ${flux_namespace}
+  timeout: 10m0s
+  # wait for all applied resources to become ready
+  wait: false

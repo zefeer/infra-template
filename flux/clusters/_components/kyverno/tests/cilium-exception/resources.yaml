@@ -1,0 +1,72 @@
+# Shaped like the real cilium agent: hostNetwork + privileged init container
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cilium-agent
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/part-of: cilium
+spec:
+  hostNetwork: true
+  initContainers:
+    - name: mount-cgroup
+      image: quay.io/cilium/cilium:v1.20.0
+      securityContext:
+        privileged: true
+  containers:
+    - name: cilium-agent
+      image: quay.io/cilium/cilium:v1.20.0
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: cilium
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/part-of: cilium
+spec:
+  selector:
+    matchLabels:
+      k8s-app: cilium
+  template:
+    metadata:
+      labels:
+        k8s-app: cilium
+        app.kubernetes.io/part-of: cilium
+    spec:
+      hostNetwork: true
+      containers:
+        - name: cilium-agent
+          image: quay.io/cilium/cilium:v1.20.0
+          securityContext:
+            privileged: true
+---
+# Same label outside kube-system: not covered by the exception
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fake-cilium
+  namespace: default
+  labels:
+    app.kubernetes.io/part-of: cilium
+spec:
+  hostNetwork: true
+  containers:
+    - name: app
+      image: quay.io/cilium/cilium:v1.20.0
+      securityContext:
+        privileged: true
+---
+# Other privileged workloads in kube-system: not covered either
+apiVersion: v1
+kind: Pod
+metadata:
+  name: other-system-pod
+  namespace: kube-system
+spec:
+  hostNetwork: true
+  containers:
+    - name: app
+      image: busybox:1.37.0
+      securityContext:
+        privileged: true

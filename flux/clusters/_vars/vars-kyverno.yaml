@@ -1,0 +1,7 @@
+helm_releaseName=kyverno
+target_namespace=kyverno
+source_repositoryUrl=https://kyverno.github.io/kyverno/
+# source_repositoryType=oci
+source_repositoryName=kyverno
+helm_chartName=kyverno
+helm_chartVersion=3.9.1

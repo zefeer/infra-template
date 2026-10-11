@@ -1,0 +1,59 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources: []
+patches: []
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    flux-role: values-configMap
+    reconcile.fluxcd.io/watch: Enabled
+configMapGenerator:
+  - name: values-cilium
+    behavior: create
+    options:
+      labels:
+        flux-app: cilium
+    files:
+      - values-${cluster_location}-${cluster_name}.yaml=values-cilium.yaml
+  - name: values-prometheus-stack
+    behavior: merge
+    options:
+      labels:
+        flux-app: prometheus-stack
+    files:
+      - values-${cluster_location}-${cluster_name}.yaml=values-prometheus-stack.yaml
+  - name: values-cert-manager
+    behavior: merge
+    options:
+      labels:
+        flux-app: cert-manager
+    files:
+      - values-${cluster_location}-${cluster_name}.yaml=values-cert-manager.yaml
+  - name: values-external-dns
+    behavior: merge
+    options:
+      labels:
+        flux-app: external-dns
+    files:
+      - values-${cluster_location}-${cluster_name}.yaml=values-external-dns.yaml
+  - name: values-alloy
+    behavior: create
+    options:
+      labels:
+        flux-app: alloy
+    files:
+      - values-${cluster_location}-${cluster_name}.yaml=values-alloy.yaml
+  - name: values-loki
+    behavior: create
+    options:
+      labels:
+        flux-app: loki
+    files:
+      - values-${cluster_location}-${cluster_name}.yaml=values-loki.yaml
+  - name: values-flux-system
+    behavior: create
+    options:
+      labels:
+        flux-app: flux-system
+    files:
+      - values-${cluster_location}-${cluster_name}.yaml=values-flux-system.yaml

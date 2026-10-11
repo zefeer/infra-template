@@ -1,0 +1,6 @@
+helm_releaseName=loki
+target_namespace=monitoring
+source_repositoryUrl=https://grafana.github.io/helm-charts
+source_repositoryName=grafana-loki
+helm_chartName=loki
+helm_chartVersion=7.3.0

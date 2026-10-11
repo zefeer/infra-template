@@ -1,0 +1,28 @@
+## --- Alertmanager ---
+## Routing/receivers stay at chart defaults (everything -> "null" receiver).
+alertmanager:
+  enabled: true
+
+  # There is no Slack or PagerDuty here, but alerts still need to leave a
+  # durable trace. Everything goes to a webhook receiver that prints each alert
+  # to stdout, which Alloy collects into Loki - so alert history survives for
+  # the log retention window instead of vanishing with the pod that caused it.
+  # send_resolved is on so the log shows the full firing -> resolved lifecycle.
+  config:
+    route:
+      group_by: ["alertname", "namespace"]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      receiver: alert-logger
+      routes:
+        # Watchdog fires permanently by design; the dashboards show it instead.
+        - matchers:
+            - alertname = "Watchdog"
+          receiver: "null"
+    receivers:
+      - name: "null"
+      - name: alert-logger
+        webhook_configs:
+          - url: http://alert-logger.monitoring.svc.cluster.local:8080/
+            send_resolved: true

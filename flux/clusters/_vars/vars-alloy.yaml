@@ -1,0 +1,6 @@
+helm_releaseName=alloy
+target_namespace=monitoring
+source_repositoryUrl=https://grafana.github.io/helm-charts
+source_repositoryName=grafana-alloy
+helm_chartName=alloy
+helm_chartVersion=1.12.1

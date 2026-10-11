@@ -1,0 +1,78 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: ${helm_releaseName}
+spec:
+  releaseName: ${helm_releaseName}
+  chart:
+    spec:
+      chart: ${helm_chartName}
+      sourceRef:
+        kind: HelmRepository
+        name: ${target_namespace}-${source_repositoryName}
+      version: ${helm_chartVersion:=~}
+  interval: ${helm_chartReconcilationInterval:=1h0m0s}
+  install:
+    # The time to wait for any individual Kubernetes operation (like Jobs for hooks) during the installation of the chart. Defaults to the global timeout value.
+    timeout: ${helm_chartInstallTimeout:=5m0s}
+    # The Custom Resource Definition install policy to use. Valid values are Skip, Create and CreateReplace. 
+    # Default is Create, which will create Custom Resource Definitions when they do not exist. 
+    # Refer to Custom Resource Definition lifecycle for more information.
+    crds: ${helm_chartInstallCRDs:=Create}
+    # Instructs Helm to re-use the release name, but only if that name is a deleted release which remains in the history. Defaults to false.
+    replace: ${helm_chartInstallReplace:=false}
+    # Instructs Helm to create the target namespace if it does not exist. On uninstall, the created namespace will not be garbage collected. Defaults to true.
+    createNamespace: ${helm_chartInstallCreateNamespace:=true}
+    # Prevents chart hooks from running during the installation of the chart. Defaults to false.
+    disableHooks: ${helm_chartInstallDisableHooks:=false}
+    # Disables chart hooks from running during the installation of the chart. Defaults to false.
+    disableOpenAPIValidation: ${helm_chartInstallDisableOpenAPIValidation:=false}
+    # Disables Helm from validating the rendered templates against the Kubernetes OpenAPI Schema. Defaults to false.
+    disableSchemaValidation: ${helm_chartInstallDisableSchemaValidation:=false}
+    # Disables taking ownership of existing resources during the Helm install action. Defaults to false.
+    disableTakeOwnership: ${helm_chartInstallDisableTakeOwnership:=false}
+    # Disables waiting for resources to be ready after the installation of the chart. Defaults to false.
+    disableWait: ${helm_chartInstallDisableWait:=false}
+    # Disables waiting for any Jobs to complete after the installation of the chart. Defaults to false.
+    disableWaitForJobs: ${helm_chartInstallDisableWaitForJobs:=false}
+    # Enables Server-Side Apply for resources during the installation. 
+    # When true, the controller uses Kubernetes Server-Side Apply which provides better conflict detection and field ownership tracking. 
+    # Defaults to true (or false when the UseHelm3Defaults feature gate is enabled).
+    serverSideApply: ${helm_chartInstallServerSideApply:=true}
+    remediation:
+      retries: ${helm_chartInstallRetries:=3}
+  upgrade:
+    remediation:
+      retries: ${helm_chartUpgradeRetries:=3}
+      strategy: rollback
+  targetNamespace: ${target_namespace}
+  storageNamespace: ${target_namespace}
+  driftDetection:
+    mode: ${helm_chartDriftDetectionMode:=warn}
+  postRenderers: ${helm_chartPostRenderers:=[]}
+  valuesFrom:
+    - kind: ConfigMap
+      name: values-${parent_kustomization:=${helm_releaseName}}
+      valuesKey: values.yaml
+      optional: true
+    - kind: ConfigMap
+      name: values-${parent_kustomization:=${helm_releaseName}}
+      valuesKey: values-${cluster_location}.yaml
+      optional: true
+    - kind: ConfigMap
+      name: values-${parent_kustomization:=${helm_releaseName}}
+      valuesKey: values-${cluster_location}-${cluster_name}.yaml
+      optional: true
+    - kind: Secret
+      name: secret-values-${parent_kustomization:=${helm_releaseName}}
+      valuesKey: secret-values.yaml
+      optional: true
+    - kind: Secret
+      name: secret-values-${parent_kustomization:=${helm_releaseName}}
+      valuesKey: secret-values-${cluster_location}.yaml
+      optional: true
+    - kind: Secret
+      name: secret-values-${parent_kustomization:=${helm_releaseName}}
+      valuesKey: secret-values-${cluster_location}-${cluster_name}.yaml
+      optional: true
+  values:

@@ -1,0 +1,6 @@
+helm_releaseName=external-dns
+target_namespace=external-dns
+source_repositoryUrl=https://kubernetes-sigs.github.io/external-dns/
+source_repositoryName=external-dns
+helm_chartName=external-dns
+helm_chartVersion=1.23.0

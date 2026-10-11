@@ -1,0 +1,23 @@
+name: policy-checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Kyverno policy tests run in flux-ci.yaml, next to the build they belong to
+env:
+  GITLEAKS_IMAGE: zricethezav/gitleaks:v8.30.0
+
+jobs:
+  gitleaks:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - run: docker run --rm -v "$PWD":/repo "$GITLEAKS_IMAGE" git /repo --redact --no-banner

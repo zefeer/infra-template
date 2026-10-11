@@ -1,0 +1,22 @@
+# Namespace comes from the component (kyverno), the only namespace allowed to hold exceptions
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: generic-device-plugin
+spec:
+  policyRefs:
+    - kind: ValidatingPolicy
+      name: disallow-host-path
+    - kind: ValidatingPolicy
+      name: disallow-privileged-containers
+  # Both conditions: the label alone can be set by anyone on any pod
+  matchConditions:
+    - name: generic-device-plugin-in-kube-system
+      expression: >-
+        object.metadata.namespace == 'kube-system' &&
+        has(object.metadata.labels) &&
+        object.metadata.labels[?'app.kubernetes.io/name'].orValue('') == 'generic-device-plugin'
+  properties:
+    reason: >-
+      Generic Device Plugin: the agent runs privileged to load device drivers and manage node devices;
+  reportResult: skip

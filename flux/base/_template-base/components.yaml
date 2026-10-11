@@ -1,0 +1,33 @@
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: ${parent_kustomization:=${helm_releaseName}}--components
+spec:
+  dependsOn:
+    - name: ${parent_kustomization:=${helm_releaseName}}
+  patches:
+    - patch: |-
+        - op: add
+          path: /metadata/namespace
+          value: ${target_namespace}
+      target:
+        kind: >-
+          .*|${patch_target_except_flux_resources}
+  interval: ${reconcilation_for_ks:="10m0s"}
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: vars-${parent_kustomization:=${helm_releaseName}}
+        optional: true
+      - kind: Secret
+        name: secrets-${parent_kustomization:=${helm_releaseName}}
+        optional: true
+  path: ./flux/clusters/_components/${parent_kustomization:=${helm_releaseName}}
+  prune: true
+  # The components paths must be local and relative to the path specified by .spec.path  
+  components: ${components:=[]}
+  # components: >-
+  #   [${use_location_components/yes/${parent_kustomization:=${helm_releaseName}}}
+  #   ${use_cluster_components/${use_cluster_components}/${use_location_components/${use_location_components}/,}}${use_cluster_components/yes/${slash}}]
+
+# ${cluster_location}${slash}${cluster_name}${slash}_components${slash}${parent_kustomization:=${helm_releaseName}}

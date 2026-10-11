@@ -1,0 +1,36 @@
+name: Setup Flux CI tools
+description: >-
+  flux CLI, Terraform and the Helm chart cache needed by .github/scripts/flux-build.sh and
+  helm-render.sh. kind, kubectl, helm, yq, jq and docker come with the ubuntu runner image.
+
+inputs:
+  flux-version:
+    description: flux CLI version, e.g. 2.9.6
+    required: true
+  terraform-version:
+    description: Terraform version, e.g. 1.5.7
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Install flux CLI
+      shell: bash
+      env:
+        FLUX_VERSION: ${{ inputs.flux-version }}
+      run: |
+        curl -sL "https://github.com/fluxcd/flux2/releases/download/v${FLUX_VERSION}/flux_${FLUX_VERSION}_linux_amd64.tar.gz" |
+          sudo tar xz -C /usr/local/bin flux
+        flux version --client && kind version && helm version --short && yq --version
+
+    - uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform-version }}
+        terraform_wrapper: false # the wrapper breaks `terraform output -raw` capture
+
+    # Chart tarballs only; helm still fetches repository indexes on every run
+    - uses: actions/cache@v4
+      with:
+        path: ~/.cache/helm
+        key: helm-${{ hashFiles('flux/**/*.yaml') }}
+        restore-keys: helm-

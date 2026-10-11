@@ -1,0 +1,25 @@
+## Flux's own controllers expose metrics on http-prom:8080, but nothing scrapes
+## them by default - the bootstrap manifests ship no PodMonitor.
+## Design notes: docs/observability.md
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: flux-system
+  namespace: flux-system
+  labels:
+    app.kubernetes.io/part-of: flux
+spec:
+  namespaceSelector:
+    matchNames:
+      - flux-system
+  selector:
+    matchLabels:
+      app.kubernetes.io/part-of: flux
+  podMetricsEndpoints:
+    - port: http-prom
+      interval: 30s
+      # Same collision guard as the application ServiceMonitors: the operator's
+      # endpoint label would otherwise shadow any the controllers export.
+      relabelings:
+        - action: labeldrop
+          regex: endpoint

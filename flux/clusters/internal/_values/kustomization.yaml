@@ -1,0 +1,24 @@
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources: []
+patches: []
+generatorOptions:
+  disableNameSuffixHash: true
+  labels:
+    flux-role: values-configMap
+    reconcile.fluxcd.io/watch: Enabled
+configMapGenerator:
+  - name: values-external-dns
+    behavior: create
+    options:
+      labels:
+        flux-app: external-dns
+    files:
+      - values-${cluster_location}.yaml=values-external-dns.yaml
+  - name: values-prometheus-stack
+    behavior: create
+    options:
+      labels:
+        flux-app: prometheus-stack
+    files:
+      - values-${cluster_location}.yaml=values-prometheus-stack.yaml

@@ -1,0 +1,19 @@
+apiVersion: cli.kyverno.io/v1alpha1
+kind: Test
+metadata:
+  name: disallow-latest-tag
+policies:
+  - ../../ValidatingPolicy-cluster-disallow-latest-tag.yaml
+resources:
+  - resources.yaml
+results:
+  - policy: disallow-latest-tag
+    isValidatingPolicy: true
+    kind: Pod
+    resources: [pinned-tag, pinned-digest, registry-port-with-tag]
+    result: pass
+  - policy: disallow-latest-tag
+    isValidatingPolicy: true
+    kind: Pod
+    resources: [latest-tag, no-tag, registry-port-no-tag, init-container-latest]
+    result: fail

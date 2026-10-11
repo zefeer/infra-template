@@ -1,0 +1,67 @@
+## Alertmanager webhook receiver: turns alerts into log lines in Loki.
+## Script and reasoning: alert-logger.py, docs/observability.md
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: alert-logger
+  namespace: monitoring
+  labels:
+    app: alert-logger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: alert-logger
+  template:
+    metadata:
+      labels:
+        app: alert-logger
+    spec:
+      containers:
+        - name: alert-logger
+          image: python:3.13-alpine
+          command: ["python", "/app/alert-logger.py"]
+          ports:
+            - containerPort: 8080
+              name: http
+          volumeMounts:
+            - name: script
+              mountPath: /app
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+      volumes:
+        - name: script
+          configMap:
+            name: alert-logger-script
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: alert-logger
+  namespace: monitoring
+  labels:
+    app: alert-logger
+spec:
+  selector:
+    app: alert-logger
+  ports:
+    - port: 8080
+      targetPort: http
+      name: http

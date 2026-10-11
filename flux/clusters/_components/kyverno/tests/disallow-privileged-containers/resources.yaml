@@ -1,0 +1,75 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-false
+spec:
+  containers:
+    - name: app
+      image: ghcr.io/home-assistant/home-assistant:2026.9.1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-true
+spec:
+  containers:
+    - name: app
+      image: nginx@sha256:5f44022eab9198d75939d9eaa5341bc077eca16fa51d4ef32d33f1bd4c8cbe7d
+      securityContext:
+        privileged: true
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cilium-agent
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/part-of: cilium
+spec:
+  containers:
+    - name: cilium-agent
+      image: quay.io/cilium/cilium:v1.20.0
+      securityContext:
+        privileged: true
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: generic-device-plugin
+  namespace: kube-system
+  labels:
+    app.kubernetes.io/name: generic-device-plugin
+spec:
+  containers:
+    - name: generic-device-plugin
+      image: squat/generic-device-plugin:latest
+      securityContext:
+        privileged: true
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cilium-agent-default
+  namespace: default
+  labels:
+    app.kubernetes.io/part-of: cilium
+spec:
+  containers:
+    - name: cilium-agent
+      image: quay.io/cilium/cilium:v1.20.0
+      securityContext:
+        privileged: true
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: generic-device-plugin-default
+  namespace: default
+  labels:
+    app.kubernetes.io/name: generic-device-plugin
+spec:
+  containers:
+    - name: generic-device-plugin
+      image: squat/generic-device-plugin:latest
+      securityContext:
+        privileged: true

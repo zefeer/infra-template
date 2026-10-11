@@ -1,0 +1,21 @@
+# Namespace comes from the component (kyverno), the only namespace allowed to hold exceptions
+apiVersion: policies.kyverno.io/v1
+kind: PolicyException
+metadata:
+  name: svclb
+spec:
+  policyRefs:
+    - kind: ValidatingPolicy
+      name: disallow-host-ports
+  # Both conditions: the label alone can be set by anyone on any pod
+  matchConditions:
+    - name: svclb-in-kube-system
+      expression: >-
+        object.metadata.namespace == 'kube-system' &&
+        has(object.metadata.labels) &&
+        object.metadata.labels[?'svccontroller.k3s.cattle.io/svcname'].orValue('').startsWith('cilium-gateway')
+  properties:
+    reason: >-
+      ServiceLB is the default lightweight load balancer built into K3s that exposes Kubernetes LoadBalancer services without needing an external cloud provider.
+      requires host-ports to be opened on the node to forward traffic to the service endpoints;
+  reportResult: skip

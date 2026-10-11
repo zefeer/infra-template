@@ -1,0 +1,7 @@
+helm_releaseName=kyverno-policy-reporter
+target_namespace=kyverno
+source_repositoryUrl=https://kyverno.github.io/policy-reporter
+# source_repositoryType=oci
+source_repositoryName=kyverno-policy-reporter
+helm_chartName=policy-reporter
+helm_chartVersion=3.11.0
